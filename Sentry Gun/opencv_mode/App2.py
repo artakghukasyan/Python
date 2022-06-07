@@ -4,7 +4,6 @@ import cv2
 from PIL import Image
 from PIL import ImageTk
 import time
-from time import sleep
 import numpy as np
 from centroidtracker import CentroidTracker
 from non_max import non_max_suppression_fast
@@ -15,8 +14,7 @@ import imghdr
 import threading
 from stepper import stepper
 import sys
-from servo import servo
-
+#from test import stepper
 
 
 
@@ -26,17 +24,7 @@ class App(threading.Thread):
         #Raspberry pi setup
 		threading.Thread.__init__(self)
 		self.s = stepper()
-		self.serv = servo()
 		self.rl_x = 0
-		self.current_x_steps = 0
-		self.current_y_steps = 0
-		self.x1 = 0
-		self.x2 = 0
-		self.y1 = 0
-		self.y2 = 0
-		self.W = 0
-		self.H =0
-		
 		# Root Settings  
 		self.is_true = is_true
 		self.root = tk.Tk()
@@ -74,8 +62,8 @@ class App(threading.Thread):
 
 		
 
-		self.start_button = tk.Button(self.right_frame, text = 'ՍԿՍԵԼ', width = 15,highlightthickness = 0, font = ("Calibri", 10, 'bold'),bg = '#FD7D00', command = self.start_camera)
-		self.stop_button = tk.Button(self.right_frame, text = 'ԵԼՔ', width = 15,highlightthickness=0, font = ("Calibri", 10, 'bold'),bg = '#FD7D00', command = self.stop_camera)
+		self.start_button = tk.Button(self.right_frame, text = 'START', width = 15,highlightthickness = 0, font = ("Calibri", 13, 'bold'),bg = '#FD7D00', command = self.start_camera)
+		self.stop_button = tk.Button(self.right_frame, text = 'EXIT', width = 15,highlightthickness=0, font = ("Calibri", 13, 'bold'),bg = '#FD7D00', command = self.stop_camera)
 		self.start_button.grid(row = 1, column = 0, pady = 50, padx = 50, stick = 'nsew')
 		self.stop_button.grid(row = 1, column = 1, pady = 50, padx = 50, stick = 'nsew')
 
@@ -84,13 +72,13 @@ class App(threading.Thread):
 
 
 
-		self.detected_label = tk.Label(self.root, text = 'ԿԱՐԳԱՎԻՃԱԿ: ՉԻ ՀԱՅՏՆԱԲԵՐՎԵԼ', font = ("Calibri", 10, 'bold'), bg = '#1A1D22', fg = 'red')
+		self.detected_label = tk.Label(self.root, text = 'STATUS: NOT DETECTED', font = ("Calibri", 15, 'bold'), bg = '#1A1D22', fg = 'red')
 		self.detected_label.place(x =0 , y = 0)
 
 
 
-		self.button_manual = tk.Button(self.root, text = 'ԿԱՌԱՎԱՐՎՈՂ', font = ("Calibri", 10, 'bold'),width = 15, bg= '#6200EE', command = self.manual)
-		self.button_automatic = tk.Button(self.root, text = 'ԱՎՏՈՄԱՏ', font = ("Calibri", 10, 'bold'),width = 15, bg= '#6200EE',command = self.start_camera)
+		self.button_manual = tk.Button(self.root, text = 'MANUAL', font = ("Calibri", 13, 'bold'),width = 15, bg= '#6200EE', command = self.manual)
+		self.button_automatic = tk.Button(self.root, text = 'AUTOMATIC', font = ("Calibri", 13, 'bold'),width = 15, bg= '#6200EE',command = self.start_camera)
 		self.button_manual.place(x = 50, y = 70)
 		self.button_automatic.place(x = 50, y = 150)
 
@@ -105,8 +93,8 @@ class App(threading.Thread):
 
 		self.camera_frame = tk.Label(self.right_frame,image = self.no_image, bg ='#2A2E37')
 		self.camera_frame.grid(column = 0, row =0, columnspan = 3, padx = 20)
-		
-		self.button_email = tk.Button(self.root, text = "ՈՒՂԱՐԿԵԼ ՄԵՅԼ", font = ("Calibri", 10,'bold'), width = 15, bg = '#6200EE',command = self.send_email)
+
+		self.button_email = tk.Button(self.root, text = "SEND MAIL", font = ("Calibri", 13,'bold'), width = 15, bg = '#6200EE', command = self.send_email)
 		self.button_email.place(x = 50, y = 220)
 
 	#Automatic Mode
@@ -116,10 +104,10 @@ class App(threading.Thread):
 		if self.video.isOpened():
 			_,frame = self.video.read()
 			frame = cv2.resize(frame, (200,200), fx = 0, fy = 0)
-			(self.H,self.W) = frame.shape[:2]
-			rows,columns,_ = frame.shape
-			center = int(columns/2)
-			blob = cv2.dnn.blobFromImage(frame, 0.007843, (self.W, self.H), 127.5)
+
+			(H,W) = frame.shape[:2]
+
+			blob = cv2.dnn.blobFromImage(frame, 0.007843, (W, H), 127.5)
 
 
 			self.detector.setInput(blob)
@@ -133,7 +121,7 @@ class App(threading.Thread):
 					if self.CLASSES[idx] != "person":
 						continue
 
-					person_box = person_detections[0, 0, i, 3:7] * np.array([self.W, self.H, self.W, self.H])
+					person_box = person_detections[0, 0, i, 3:7] * np.array([W, H, W, H])
 					(startX, startY, endX, endY) = person_box.astype("int")
 					rects.append(person_box)
 				
@@ -146,27 +134,26 @@ class App(threading.Thread):
 			tracker = CentroidTracker(maxDisappeared=80, maxDistance=90)
 			objects = tracker.update(rects)
 			for (self.objectId, bbox) in objects.items():
- 				self.x1, self.y1, self.x2, self.y2 = bbox
- 				self.x1 = int(self.x1)
- 				self.y1 = int(self.y1)
- 				self.x2 = int(self.x2)
- 				self.y2 = int(self.y2)
- 				cv2.rectangle(frame, (self.x1, self.y1), (self.x2, self.y2), (0, 0, 255), 2)
+ 				x1, y1, x2, y2 = bbox
+ 				x1 = int(x1)
+ 				y1 = int(y1)
+ 				x2 = int(x2)
+ 				y2 = int(y2)
+ 				cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
  				text = "ID: {}".format(self.objectId)
- 				cv2.putText(frame, text, (self.x1, self.y1-5), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (0, 0, 255), 1)
+ 				cv2.putText(frame, text, (x1, y1-5), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (0, 0, 255), 1)
  				#print(x1,x2,y1,y2)
 			if self.objectId not in self.list_id:
 				self.list_id.append(self.objectId)
 
 
 			if len(rects) > 0:
-				self.x_axis()
-				self.detected_label.config(text = f'ԿԱՐԳԱՎԻՃԱԿ: ՀԱՅՏՆԱԲԵՐՎԵԼ Է {len(rects)} ', fg = 'green') 
+				self.detected_label.config(text = f'STATUS: DETECTED {len(rects)} ', fg = 'green') 
 			else:
-				self.detected_label.config(text = 'ԿԱՐԳԱՎԻՃԱԿ: ՉԻ ՀԱՅՏՆԱԲԵՐՎԵԼ', fg = 'red') 
+				self.detected_label.config(text = 'STATUS: NOT DETECTED', fg = 'red') 
 					
 			
-			
+
 			frame = Image.fromarray(frame)
 			frame = ImageTk.PhotoImage(frame)
 			self.camera_frame.config(image=frame)
@@ -177,6 +164,8 @@ class App(threading.Thread):
 	def manual_camera(self):
 		self.root.bind('<Left>', self.left_key)
 		self.root.bind('<Right>', self.right_key)
+		self.root.bind('<Up>', self.up_key)
+		self.root.bind('<Down>', self.down_key)
 		self.root.bind('<f>', self.f_key)
 		
 		_,frame = self.video.read()
@@ -185,7 +174,6 @@ class App(threading.Thread):
 		h,w = frame.shape[:2]
 		center_h = int(h / 2.0)
 		center_w = int(w / 2.0)
-
 		
 		cv2.line(frame,(0,center_h),(w,center_h),(255,0,0),1)
 		cv2.line(frame,(center_w,0),(center_w, h ),(255,0,0),1)
@@ -209,48 +197,39 @@ class App(threading.Thread):
 		self.button_manual.config(command = self.do_nothing, fg = 'gray', bg = '#eee')
 		self.button_automatic.config(command = self.do_nothing, fg = 'gray', bg = '#eee')
 		self.manual_camera()
+
+	def left_key(self,event):
+		self.rl_x = self.rl_x + 5
 		
-	def x_axis(self):
-		center  = int((self.W / 2))
-		x_medium = int((self.x1 + self.x1 + self.x2) / 2)
-		t_x = threading.Thread()
-		t_fire = threading.Thread()
-	
-		if x_medium < center:
-			t_x = threading.Thread(target = self.left_key,args = (1,))
-
-		elif x_medium > center:
-			t_x = threading.Thread(target = self.right_key, args = (1,))
-		
-		if (x_medium - center) >= 0 and (x_medium - center) <= 3:
-			t_fire = threading.Thread(target = self.f_key,args = (1,))
-		elif (x_medium - center) <= 0 and (x_medium - center) >= -3:
-			t_fire = threading.Thread(target = self.f_key,args = (1,))
-            
- 
-		t_x.start()
-		t_fire.start()
-		t_x.join()
-		t_fire.join()
-
-                
-                
-                
-
-
-	def left_key(self,event=None):
-		self.s.TURN_LEFT(1)
-		
-	def right_key(self,event=None):
+		if self.rl_x == 70:
+		   self.s.TURN_RIGHT(90)
+		   self.rl_x = 0
 		   
-		self.s.TURN_RIGHT(1)        
+		self.s.TURN_LEFT(5)        
+		
+		
+	def right_key(self,event):
+		self.rl_x = self.rl_x - 5
+		
+		if self.rl_x == -70:
+		   self.s.TURN_LEFT(90)
+		   self.rl_x = 0
+		   
+		self.s.TURN_RIGHT(5)        
+		
+		
+	def up_key(self,event = None):
+		print("Up")
+
+	def down_key(self,event = None):
+		self.s.TURN_LEFT(50)
 
 	def f_key(self,event = None):
-        
-		self.serv.fire()
+		print("F")
 
 	def do_nothing(slef):
 		pass
+
 
 	def send_email(self):
 
@@ -283,11 +262,11 @@ class App(threading.Thread):
 				smpt.sendmail(sender,receiver, msg.as_string())
 				smpt.quit()
 				os.remove('Images/sentry.jpg')
-				messagebox.showinfo("Succes ", "ՄԵՅԼԸ ՀԱՋՈՂՈՒԹՅԱՄԲ ՈՒՂԱՐԿՎԱԾ Է")
+				messagebox.showinfo("Succes ", "Email Successfuly Sent!")
 			except Exception as e:
 				messagebox.showerror("Error", e)
 		else:
-			messagebox.showerror("Error","ՍԽՄԵՔ ՍԿՍԵԼ ՄԵՅԼ ՈՒՂԱՐԿԵԼՈՒՑ ԱՌԱՋ")
+			messagebox.showerror("Error","Press Start before sending email")
 
 
 
@@ -295,7 +274,7 @@ class App(threading.Thread):
 		self.video.release()
 		cv2.destroyAllWindows()
 		self.camera_frame.config(image =self.no_image)
-		self.detected_label.config(text= 'ԿԱ: NOT DETECTED', fg = 'red')
+		self.detected_label.config(text= 'STATUS: NOT DETECTED', fg = 'red')
 		self.start_button.config(command = self.start_camera, fg = '#000', bg = '#FD7D00')
 		self.button_automatic.config(command = self.start_camera, fg = '#000', bg = '#6200EE')
 		self.button_manual.config(command = self.manual, fg = '#000', bg = '#6200EE')
